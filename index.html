@@ -14,18 +14,23 @@
 	<body>
 
 		<video id="localVideo" autoplay playsinline></video>
+		<video id="localScreen" autoplay playsinline></video>
 		<video id="remoteVideo" autoplay playsinline></video>
+		<video id="remoteScreenShare" autoplay playsinline></video>
 
 		<div>
 			<p>
 				If you are the host, copy the offer and send it to the remote:
-				<button id="createOffer">create</button><input type="text" id="localOffer" placeholder="local offer"/><br/>
+				<button id="createOffer">create</button>
+				<input type="text" id="localOffer" placeholder="local offer"/><br/>
 				Then paste the remote answer and accept it:
-				<input type="text" id="remoteAnswer" placeholder="remote answer"/><button id="acceptAnswer">accept</button>
+				<input type="text" id="remoteAnswer" placeholder="remote answer"/>
+				<button id="acceptAnswer">accept</button>
 			</p>
 			<p>
 				if you are the remote, paste the hosts offer and accept it:
-				<input type="text" id="remoteOffer" placeholder="remote offer"//><button id="acceptOffer">accept</button><br/>
+				<input type="text" id="remoteOffer" placeholder="remote offer"//>
+				<button id="acceptOffer">accept</button><br/>
 				Then copy your answer and send it to the host:
 				<input type="text" id="localAnswer" placeholder="local answer"/>
 			</p>
@@ -34,12 +39,18 @@
 		<script type="text/javascript">
 			'use strict';
 
-			const mediaStreamConstraints = {video: true};
+			const mediaStreamConstraints = {video: true, audio: true}; // add audio track to stream
+			const screenSharingConstraints = {video: true};
+
 			const offerOptions = {offerToReceiveVideo:1};
 			const servers = {'iceServers': [{'url': 'stun:stun.l.google.com:19302'}]};
 
 			const localVideo = document.getElementById('localVideo');
 			const remoteVideo = document.getElementById('remoteVideo');
+
+			// get access to HTML elements for screen sharing
+			const localScreen = document.getElementById('localScreen');
+			const remoteScreenShare = document.getElementById('remoteScreenShare');
 
 			const localOffer = document.getElementById('localOffer');
 			const remoteOffer = document.getElementById('remoteOffer');
@@ -55,21 +66,20 @@
 			acceptOffer.addEventListener('click', offerAccept);
 			acceptAnswer.addEventListener('click', answerAccept);
 
-
 			// Create peer connections and add behavior.
 			const peerConnection = new RTCPeerConnection(servers);
 			console.log('Created peer connection');
 
 			peerConnection.addEventListener('icecandidate', handleConnection);
 			peerConnection.addEventListener('addstream', gotRemoteMediaStream);
-			
+
 			const peerMediaStream = new MediaStream();
 			peerConnection.addStream(peerMediaStream);
 
 			// get the video media stream
 			navigator.mediaDevices.getUserMedia(mediaStreamConstraints)
 				.then((mediaStream) => {
-				
+
 					localVideo.srcObject = mediaStream;
 
 					for (const track of mediaStream.getTracks())
@@ -77,33 +87,57 @@
 					}
 				)
 				.catch(logError);
-	
+
+				// get access to the local screen for screensharing
+				navigator.mediaDevices.getDisplayMedia(screenSharingConstraints)
+					.then((screenShare) => {
+
+						// display local screen in broswer
+						localScreen.srcObject = screenShare;
+
+						for(const track of screenShare.getTracks()) {
+							peerMediaStream.addTrack(track);
+						}
+					})
+					.catch(logError);
+
 			function handleConnection(event) {
 
 				const connection = event.target;
 				const iceCandidate = event.candidate;
-				
+
 				if (iceCandidate == null)
 				{
 					const description = connection.localDescription;
 					const descriptionType = description.type;
 					const descriptionString = JSON.stringify(description);
-					
+
 					if (descriptionType == 'offer') {
 
 						localOffer.value = descriptionString;
-						
+
 					} else {
-						
+
 						localAnswer.value = descriptionString;
 					}
 				}
 			}
-					
+
 			function gotRemoteMediaStream(event) {
 
 				const mediaStream = event.stream;
-				remoteVideo.srcObject = mediaStream;
+				const tracks = mediaStream.getTracks();
+
+				// add remote video track to a new stream and display in browser
+				const remoteVideoStream = new MediaStream();
+				remoteVideoStream.addTrack(tracks[1]);
+				remoteVideo.srcObject = remoteVideoStream;
+
+				// add remote screen share track to a new stream and display in browser
+				const remoteScreenStream = new MediaStream();
+				remoteScreenStream.addTrack(tracks[2]);
+				remoteScreenShare.srcObject = remoteScreenStream;
+
 				console.log('remote peer connection received remote stream')
 			}
 
@@ -125,15 +159,15 @@
 			function offerAccept() {
 
 				const description = JSON.parse(remoteOffer.value);
-				
+
 				peerConnection.setRemoteDescription(description)
 					.then(() => {console.log('remote peer offer accepted');})
 					.catch(logError);
-					
+
 				peerConnection.createAnswer()
 					.then(createdAnswer)
 					.catch(logError);
-				
+
 			}
 
 			function createdAnswer(description) {
@@ -150,16 +184,16 @@
 				peerConnection.setRemoteDescription(description)
 					.then(() => {console.log('Local peer remote description set');})
 					.catch(logError);
-				
+
 			}
-					
-					
+
+
 			function logError(error) {
 
 				console.log(error.toString());
 			}
-		
-		
+
+
 		</script>
 
 	</body>
