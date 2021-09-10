@@ -130,7 +130,8 @@
 
 				// add remote video track to a new stream and display in browser
 				const remoteVideoStream = new MediaStream();
-				remoteVideoStream.addTrack(tracks[1]);
+				remoteVideoStream.addTrack(tracks[0]); // add audio
+				remoteVideoStream.addTrack(tracks[1]); // add video
 				remoteVideo.srcObject = remoteVideoStream;
 
 				// add remote screen share track to a new stream and display in browser
